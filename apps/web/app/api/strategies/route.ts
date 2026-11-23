@@ -1,7 +1,7 @@
 import { prisma, saveSettings } from '@att/server';
 import { handle, requireUser, HttpError } from '@/lib/auth';
 import { DEFAULT_TPSL } from '@att/core';
-export const PRESETS = [
+const PRESETS = [
   { name: 'Konservatif - likuiditas dalam', mode: 'CONSERVATIVE', params: { limits: { minLiquidityUsd: 60000, maxTop10HolderPct: 25 }, tpsl: { ...DEFAULT_TPSL, stopLossPct: 10 } } },
   { name: 'Seimbang - momentum', mode: 'BALANCED', params: { limits: {}, tpsl: DEFAULT_TPSL } },
   { name: 'Agresif - entry awal', mode: 'AGGRESSIVE', params: { limits: { maxSlippagePct: 8 }, tpsl: { ...DEFAULT_TPSL, stopLossPct: 20, trailing: { activateGainPct: 40, trailPct: 18 } } } },
