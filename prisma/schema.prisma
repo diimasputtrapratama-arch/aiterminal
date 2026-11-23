@@ -1,0 +1,260 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  timezone       String   @default("UTC")
+  telegramChatId String?
+  createdAt      DateTime @default(now())
+  instructions   AIInstructions[]
+  strategies     AIStrategies[]
+  wallets        WalletTracking[]
+  dailyReports   DailyReports[]
+  monthlyReports MonthlyReports[]
+  executions     ExecutionLogs[]
+  alerts         TokenAlerts[]
+  settings       UserSettings?
+  positions      Positions[]
+  ledger         LedgerEntries[]
+  equity         EquitySnapshots[]
+}
+model SolanaTokens {
+  mint           String   @id
+  symbol         String?
+  name           String?
+  source         String
+  createdAtChain DateTime?
+  discoveredAt   DateTime @default(now())
+  metadata       TokenMetadata?
+  security       TokenSecurity[]
+  pools          LiquidityPools[]
+  txs            TokenTransactions[]
+  signals        SmartMoneySignals[]
+  alerts         TokenAlerts[]
+}
+model TokenMetadata {
+  mint     String  @id
+  uri      String?
+  imageUrl String?
+  twitter  String?
+  telegram String?
+  website  String?
+  mutable  Boolean?
+  token    SolanaTokens @relation(fields: [mint], references: [mint])
+}
+model TokenSecurity {
+  id                     String   @id @default(cuid())
+  mint                   String
+  mintAuthorityRevoked   Boolean?
+  freezeAuthorityRevoked Boolean?
+  top10HolderPct         Float?
+  lpLockedOrBurned       Boolean?
+  honeypotSuspected      Boolean?
+  riskScore              Float?
+  rawJson                Json?
+  checkedAt              DateTime @default(now())
+  token                  SolanaTokens @relation(fields: [mint], references: [mint])
+  @@index([mint, checkedAt])
+}
+model LiquidityPools {
+  id                       String   @id @default(cuid())
+  mint                     String
+  dex                      String
+  poolAddress              String   @unique
+  liquidityUsd             Float?
+  migratedFromBondingCurve Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+  token                    SolanaTokens @relation(fields: [mint], references: [mint])
+}
+model TokenTransactions {
+  id        String   @id @default(cuid())
+  mint      String
+  signature String   @unique
+  side      String
+  wallet    String
+  amountUsd Float?
+  slot      BigInt
+  blockTime DateTime
+  token     SolanaTokens @relation(fields: [mint], references: [mint])
+  @@index([mint, blockTime])
+}
+model WalletTracking {
+  id          String   @id @default(cuid())
+  userId      String
+  address     String
+  label       String?
+  addedAt     DateTime @default(now())
+  user        User @relation(fields: [userId], references: [id])
+  performance WalletPerformance[]
+  @@unique([userId, address])
+}
+model WalletPerformance {
+  id               String   @id @default(cuid())
+  walletId         String
+  winRate          Float?
+  realizedPnlUsd   Float?
+  unrealizedPnlUsd Float?
+  trades           Int      @default(0)
+  computedAt       DateTime @default(now())
+  wallet           WalletTracking @relation(fields: [walletId], references: [id])
+}
+model SmartMoneySignals {
+  id            String   @id @default(cuid())
+  mint          String
+  walletAddress String
+  action        String
+  notes         String?
+  createdAt     DateTime @default(now())
+  token         SolanaTokens @relation(fields: [mint], references: [mint])
+}
+model AIInstructions {
+  id           String   @id @default(cuid())
+  userId       String
+  kind         String
+  text         String
+  parsedParams Json?
+  active       Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+  user         User @relation(fields: [userId], references: [id])
+}
+model AIStrategies {
+  id     String  @id @default(cuid())
+  userId String
+  name   String
+  mode   String
+  params Json
+  memory Json?
+  live   Boolean @default(false)
+  user   User @relation(fields: [userId], references: [id])
+}
+model AIAgentLogs {
+  id        String   @id @default(cuid())
+  agent     String
+  mint      String?
+  input     Json
+  output    Json
+  createdAt DateTime @default(now())
+  @@index([agent, createdAt])
+}
+model DailyReports {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  metrics   Json
+  aiSummary String?
+  user      User @relation(fields: [userId], references: [id])
+  @@unique([userId, date])
+}
+model MonthlyReports {
+  id           String @id @default(cuid())
+  userId       String
+  month        String
+  metrics      Json
+  aiEvaluation String?
+  user         User @relation(fields: [userId], references: [id])
+  @@unique([userId, month])
+}
+model TradingCalendar {
+  id      String   @id @default(cuid())
+  userId  String
+  date    DateTime
+  pnlUsd  Float
+  trades  Int
+  winRate Float?
+  @@unique([userId, date])
+}
+model TradingPerformance {
+  id             String   @id @default(cuid())
+  userId         String
+  strategyId     String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  profitFactor   Float?
+  maxDrawdownPct Float?
+  metrics        Json
+}
+model TokenAlerts {
+  id        String   @id @default(cuid())
+  userId    String
+  mint      String?
+  type      String
+  message   String
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id])
+  token     SolanaTokens? @relation(fields: [mint], references: [mint])
+}
+model ExecutionLogs {
+  id           String   @id @default(cuid())
+  userId       String
+  mint         String
+  side         String
+  mode         String
+  sizeUsd      Float
+  riskApproved Boolean
+  riskReasons  Json
+  txSignature  String?
+  feeUsd       Float?
+  createdAt    DateTime @default(now())
+  user         User @relation(fields: [userId], references: [id])
+}
+
+model UserSettings {
+  userId    String   @id
+  secrets   Json     @default("{}")  // nama -> ciphertext AES-256-GCM
+  config    Json     @default("{}")  // mode, tpsl, limits, autoTrade, tradingMode, dll.
+  updatedAt DateTime @updatedAt
+  user      User @relation(fields: [userId], references: [id])
+}
+model Positions {
+  id               String    @id @default(cuid())
+  userId           String
+  mint             String
+  symbol           String?
+  strategyId       String?
+  mode             String    // paper | live
+  status           String    @default("OPEN") // OPEN | CLOSED
+  entryPrice       Float
+  initialQty       Float
+  remainingQty     Float
+  costUsd          Float
+  feesUsd          Float     @default(0)
+  networkFeesUsd   Float     @default(0)
+  proceedsUsd      Float     @default(0)
+  entryLiquidityUsd Float?
+  entrySlippagePct Float?
+  peakGainPct      Float     @default(0)
+  state            Json
+  tpsl             Json
+  lastPrice        Float?
+  openedAt         DateTime  @default(now())
+  closedAt         DateTime?
+  user             User @relation(fields: [userId], references: [id])
+  @@index([userId, status])
+  @@index([userId, closedAt])
+}
+model LedgerEntries {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // DEPOSIT | WITHDRAWAL | BUY | SELL | FEE
+  amountUsd Float
+  note      String?
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id])
+  @@index([userId, createdAt])
+}
+model EquitySnapshots {
+  id        String   @id @default(cuid())
+  userId    String
+  at        DateTime @default(now())
+  equityUsd Float
+  user      User @relation(fields: [userId], references: [id])
+  @@index([userId, at])
+}

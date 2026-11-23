@@ -1,0 +1,9 @@
+'use client';
+import { useState } from 'react'; import { api, useApi, short } from '@/lib/client';
+export default function Wallets() {
+  const { data, reload } = useApi('/api/wallets', 20000); const [addr, setA] = useState(''); const [label, setL] = useState(''); const [msg, setMsg] = useState('');
+  return <><div className="card"><h2>Smart wallet tracking</h2><div className="row"><input style={{ flex: 1, minWidth: 200 }} placeholder="Alamat wallet Solana" value={addr} onChange={(e) => setA(e.target.value.trim())} /><input placeholder="Label" value={label} onChange={(e) => setL(e.target.value)} style={{ width: 120 }} /><button onClick={async () => { try { await api('/api/wallets', { body: { address: addr, label } }); setA(''); setL(''); reload(); } catch (e: any) { setMsg(e.message); } }}>Tambah</button></div><p className="err">{msg}</p>
+    <p className="m">Aktivitas whale bukan otomatis sinyal beli. Performa dihitung dari transaksi yang terpantau sejak wallet ditambahkan.</p></div>
+    <div className="card"><div className="sc"><table><thead><tr><th>Wallet</th><th>Label</th><th>Trade terpantau</th><th></th></tr></thead><tbody>{data?.wallets.map((w: any) => <tr key={w.id}><td>{short(w.address)}</td><td>{w.label}</td><td>{w.performance[0]?.trades ?? 0}</td><td><button className="dg" onClick={async () => { await api('/api/wallets', { method: 'DELETE', body: { address: w.address } }); reload(); }}>Hapus</button></td></tr>)}</tbody></table></div></div>
+    <div className="card"><h2>Transaksi terbaru</h2><div className="sc"><table><tbody>{data?.signals.map((s: any) => <tr key={s.id}><td className={s.action === 'BUY' ? 'g' : 'r'}>{s.action}</td><td>{short(s.walletAddress)}</td><td><a href={`/token/${s.mint}`}>{short(s.mint)}</a></td><td className="m">{new Date(s.createdAt).toLocaleString()}</td></tr>)}</tbody></table></div></div></>;
+}

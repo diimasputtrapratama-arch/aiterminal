@@ -1,0 +1,23 @@
+'use client';
+import { useState } from 'react'; import { useApi, usd, pct, cls } from '@/lib/client';
+const ym = (d: Date) => d.toISOString().slice(0, 7);
+export default function Calendar() {
+  const [view, setView] = useState<'month' | 'week' | 'day' | 'year'>('month'); const [month, setMonth] = useState(ym(new Date())); const [sel, setSel] = useState<string | null>(null);
+  const year = month.slice(0, 4); const { data } = useApi(view === 'year' ? `/api/calendar?year=${year}` : `/api/calendar?month=${month}`); const day = useApi(sel ? `/api/calendar?date=${sel}` : null);
+  const shift = (n: number) => { const [y, m] = month.split('-').map(Number); setMonth(view === 'year' ? `${y + n}-${String(m).padStart(2, '0')}` : ym(new Date(Date.UTC(y, m - 1 + n, 1)))); };
+  const map = new Map<string, any>((data?.days ?? []).map((d: any) => [d.date, d])); const [y, m] = month.split('-').map(Number); const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); const dim = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const cells = Array.from({ length: first }, () => null).concat(Array.from({ length: dim }, (_, i) => i + 1) as any); const key = (d: number) => `${month}-${String(d).padStart(2, '0')}`;
+  const today = data?.today ?? ''; const wkStart = today ? new Date(new Date(today + 'T00:00:00Z').getTime() - ((new Date(today + 'T00:00:00Z').getUTCDay() + 6) % 7) * 864e5) : null;
+  const week = wkStart ? Array.from({ length: 7 }, (_, i) => new Date(+wkStart + i * 864e5).toISOString().slice(0, 10)) : [];
+  const months = Array.from({ length: 12 }, (_, i) => { const k = `${year}-${String(i + 1).padStart(2, '0')}`; const ds = (data?.days ?? []).filter((d: any) => d.date.startsWith(k)); return { k, pnl: ds.reduce((a: number, d: any) => a + d.pnl, 0), trades: ds.reduce((a: number, d: any) => a + d.trades, 0) }; });
+  const Cell = ({ k, label }: { k: string; label: string }) => { const d = map.get(k); return <div className={d ? (d.pnl > 0 ? 'P' : d.pnl < 0 ? 'L' : '') : ''} onClick={() => setSel(k)}><b>{label}</b>{d ? <><div className={cls(d.pnl)}>{usd(d.pnl)}</div><div className="m">{d.trades}t • {pct(d.winRatePct, 0)}</div></> : <div className="m">–</div>}</div>; };
+  const from = view === 'year' ? `${year}-01-01` : `${month}-01`; const to = view === 'year' ? `${year}-12-31` : `${month}-${String(dim).padStart(2, '0')}`;
+  return <><div className="card"><div className="row">{(['day', 'week', 'month', 'year'] as const).map((v) => <button key={v} className={view === v ? '' : 'sec'} onClick={() => setView(v)}>{{ day: 'Harian', week: 'Mingguan', month: 'Bulanan', year: 'Tahunan' }[v]}</button>)}
+    <button className="sec" onClick={() => shift(-1)}>‹</button><b>{view === 'year' ? year : month}</b><button className="sec" onClick={() => shift(1)}>›</button></div>
+    <div className="row noprint" style={{ marginTop: 8 }}><a href={`/api/export?from=${from}&to=${to}`}><button className="sec">Export CSV</button></a><button className="sec" onClick={() => window.print()}>Export PDF (cetak)</button><span className="m">🟩 profit 🟥 loss ⬜ tanpa transaksi</span></div></div>
+    {view === 'month' && <div className="card"><div className="cal">{['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((x) => <b key={x} className="m">{x}</b>)}{cells.map((c: any, i: number) => c ? <Cell key={i} k={key(c)} label={String(c)} /> : <span key={i} />)}</div></div>}
+    {view === 'week' && <div className="card"><div className="cal" style={{ gridTemplateColumns: 'repeat(7,1fr)' }}>{week.map((k) => <Cell key={k} k={k} label={k.slice(5)} />)}</div><p className="m">Minggu berjalan (Sen–Min). Data bulan {month}; pindah bulan bila perlu.</p></div>}
+    {view === 'day' && <div className="card"><h2>Hari ini: {today}</h2><div className="cal" style={{ gridTemplateColumns: '1fr' }}><Cell k={today} label={today} /></div></div>}
+    {view === 'year' && <div className="card"><div className="grid">{months.map((x) => <div key={x.k} className={'card ' + cls(x.pnl)} onClick={() => { setMonth(x.k); setView('month'); }}><b>{x.k}</b><div className={cls(x.pnl)}>{usd(x.pnl)}</div><div className="m">{x.trades} trade</div></div>)}</div></div>}
+    {sel && <div className="card"><h2>Transaksi {sel}</h2><div className="sc"><table><thead><tr><th>Token</th><th>Buka</th><th>Tutup</th><th>Modal</th><th>Hasil</th><th>Fee</th><th>Net</th></tr></thead><tbody>{day.data?.trades.map((t: any, i: number) => <tr key={i}><td>{t.symbol ?? t.mint.slice(0, 6)}</td><td>{new Date(t.openedAt).toLocaleTimeString()}</td><td>{new Date(t.closedAt).toLocaleTimeString()}</td><td>{usd(t.costUsd)}</td><td>{usd(t.proceedsUsd)}</td><td>{usd(t.feesUsd + t.networkFeesUsd)}</td><td className={cls(t.net)}>{usd(t.net)}</td></tr>)}</tbody></table></div></div>}</>;
+}

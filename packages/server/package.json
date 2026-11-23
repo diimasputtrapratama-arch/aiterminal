@@ -1,0 +1,7 @@
+{
+  "name": "@att/server",
+  "version": "0.2.0",
+  "main": "src/index.ts",
+  "dependencies": { "@att/core": "*", "@prisma/client": "^5.22.0" },
+  "devDependencies": { "typescript": "^5.6.0", "@types/node": "^22.0.0" }
+}
